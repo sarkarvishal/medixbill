@@ -1,0 +1,1499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Rx Ledger — a private, on-device medicine inventory, billing and expiry tracker. No server, no sign-up.">
+<meta name="theme-color" content="#1F4B3F">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%231F4B3F%27/%3E%3Cpath d=%27M24 14h16v10H24zM20 24h24v26a4 4 0 0 1-4 4H24a4 4 0 0 1-4-4z%27 fill=%27%23F4F6F0%27/%3E%3Cpath d=%27M32 30v18M23 39h18%27 stroke=%27%231F4B3F%27 stroke-width=%275%27 stroke-linecap=%27round%27/%3E%3C/svg%3E">
+<title>Rx Ledger — Medicine Inventory (Local)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --color-bg:#F5F7F1;
+    --color-surface:#FFFFFF;
+    --color-primary:#1F4B3F;
+    --color-primary-light:#2F6552;
+    --color-ink:#23271F;
+    --color-muted:#6B7268;
+    --color-border:#DDE3D8;
+    --color-amber:#C97A2B;
+    --color-danger:#B23A2E;
+    --color-safe:#3E7B5C;
+    --font-display:'Fraunces',serif;
+    --font-body:'Inter',sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--color-bg);color:var(--color-ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;}
+  a{color:inherit;}
+
+  header{
+    background:var(--color-primary);color:#F4F6F0;padding:22px 28px;
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+  }
+  header .brand{display:flex;align-items:baseline;gap:10px;}
+  header h1{font-family:var(--font-display);font-weight:700;font-size:1.7rem;margin:0;letter-spacing:0.01em;}
+  header .brand small{font-family:var(--font-mono);font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;color:#B9CBC0;}
+  #save-status{font-family:var(--font-mono);font-size:0.72rem;color:#C9D8CE;text-align:right;}
+
+  #device-banner{background:#EAF2EC;border-bottom:1px solid #C9DCCE;color:#1F4B3F;padding:11px 28px;font-size:0.85rem;}
+  #device-banner b{font-weight:600;}
+
+  main{max-width:1220px;margin:0 auto;padding:24px 28px 80px;}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit, minmax(150px,1fr));gap:14px;margin-bottom:22px;}
+  .stat-card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius);padding:16px 18px;}
+  .stat-card .num{font-family:var(--font-display);font-size:1.9rem;font-weight:700;line-height:1;}
+  .stat-card .label{font-size:0.78rem;color:var(--color-muted);margin-top:6px;letter-spacing:0.02em;}
+  .stat-card.expired .num{color:var(--color-danger);}
+  .stat-card.soon .num{color:var(--color-amber);}
+  .stat-card.safe .num{color:var(--color-safe);}
+  .stat-card.cost .num{color:var(--color-amber);}
+  .stat-card.profit .num{color:var(--color-primary);}
+
+  h3.section-label{font-family:var(--font-display);font-size:1rem;font-weight:600;margin:26px 0 10px;color:var(--color-primary);}
+
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+  .toolbar input[type=text], .toolbar select{
+    font-family:var(--font-body);padding:9px 12px;border:1px solid var(--color-border);
+    border-radius:8px;background:var(--color-surface);font-size:0.88rem;color:var(--color-ink);
+  }
+  #search-input{flex:1;min-width:180px;}
+  .btn{font-family:var(--font-body);font-weight:600;font-size:0.85rem;padding:9px 16px;border-radius:8px;border:1px solid transparent;cursor:pointer;transition:transform 0.08s ease, background 0.15s ease;}
+  .btn:active{transform:scale(0.97);}
+  .btn-primary{background:var(--color-primary);color:#fff;}
+  .btn-primary:hover{background:var(--color-primary-light);}
+  .btn-sale{background:var(--color-amber);color:#fff;}
+  .btn-sale:hover{background:#B36A24;}
+  .btn-return{background:#F7E9E6;color:#8C3B2E;border-color:#E9C9C2;}
+  .btn-return:hover{background:#F1DAD5;}
+  .btn-ghost{background:transparent;border-color:var(--color-border);color:var(--color-ink);}
+  .btn-ghost:hover{background:#00000008;}
+  .btn-icon{padding:8px 10px;line-height:1;}
+
+  .backup-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px;}
+  .backup-row .hint{font-size:0.78rem;color:var(--color-muted);}
+  #import-input{display:none;}
+
+  .category-section{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius);margin-bottom:14px;overflow:hidden;}
+  .category-header{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;cursor:pointer;user-select:none;gap:14px;flex-wrap:wrap;}
+  .category-header h2{font-family:var(--font-display);font-size:1.05rem;font-weight:600;margin:0;display:flex;align-items:center;gap:10px;}
+  .category-header .count{font-family:var(--font-mono);font-size:0.72rem;color:var(--color-muted);background:var(--color-bg);padding:2px 8px;border-radius:20px;}
+  .category-header .chevron{transition:transform 0.15s ease;color:var(--color-muted);}
+  .category-section.collapsed .chevron{transform:rotate(-90deg);}
+  .category-section.collapsed .table-wrap{display:none;}
+  .sales-summary{font-family:var(--font-mono);font-size:0.76rem;color:var(--color-muted);}
+
+  .table-wrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:0.85rem;}
+  thead th{text-align:left;font-size:0.68rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--color-muted);padding:8px 14px;border-top:1px solid var(--color-border);border-bottom:1px solid var(--color-border);font-weight:600;white-space:nowrap;}
+  tbody td{padding:11px 14px;border-bottom:1px solid var(--color-border);vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr.row-expired{background:rgba(178,58,46,0.04);}
+  tbody tr.row-soon{background:rgba(201,122,43,0.05);}
+  tbody tr.row-today{background:rgba(31,75,63,0.07);}
+  tbody tr.row-today td:first-child{font-weight:700;}
+  .med-name{font-weight:600;}
+  .med-sub{font-size:0.76rem;color:var(--color-muted);}
+  .mono{font-family:var(--font-mono);font-size:0.8rem;color:var(--color-ink);}
+  .margin-pos{color:var(--color-safe);font-weight:600;}
+  .margin-neg{color:var(--color-danger);font-weight:600;}
+  .qty-zero{color:var(--color-danger);font-weight:700;}
+
+  .status-stamp{display:inline-block;padding:2px 10px;border:2px solid currentColor;border-radius:3px;font-family:var(--font-mono);font-size:0.66rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;}
+  .status-stamp.expired{color:var(--color-danger);background:rgba(178,58,46,0.06);transform:rotate(-3deg);}
+  .status-stamp.soon{color:var(--color-amber);background:rgba(201,122,43,0.08);transform:rotate(2deg);}
+  .status-stamp.ok{color:var(--color-safe);background:rgba(62,123,92,0.06);transform:rotate(-1deg);}
+
+  .row-actions{display:flex;gap:6px;}
+  .row-actions button{background:none;border:1px solid var(--color-border);border-radius:6px;width:30px;height:30px;cursor:pointer;font-size:0.85rem;color:var(--color-muted);}
+  .row-actions button:hover{background:var(--color-bg);color:var(--color-ink);}
+
+  .empty-state{padding:40px 18px;text-align:center;color:var(--color-muted);font-size:0.9rem;}
+
+  /* Billing panel */
+  .billing-add-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:14px 18px;border-bottom:1px solid var(--color-border);}
+  .billing-add-row select{flex:1;min-width:220px;padding:9px 12px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-bg);font-size:0.88rem;font-family:var(--font-body);}
+  .billing-add-row input[type=number]{width:90px;padding:9px 12px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-bg);font-family:var(--font-body);font-size:0.88rem;}
+  .billing-hint{padding:0 18px 12px;font-size:0.78rem;color:var(--color-muted);}
+  .billing-hint.warn{color:var(--color-danger);font-weight:600;}
+  .billing-total-row{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-top:1px solid var(--color-border);font-size:0.9rem;flex-wrap:wrap;gap:8px;}
+  .billing-total-row .grand-total{font-family:var(--font-display);font-size:1.35rem;font-weight:700;color:var(--color-primary);}
+  .billing-actions{display:flex;justify-content:flex-end;gap:10px;padding:14px 18px;border-top:1px solid var(--color-border);}
+
+  #modal-overlay, #sale-modal-overlay, #return-modal-overlay{position:fixed;inset:0;background:rgba(35,39,31,0.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:50;}
+  #modal-overlay.open, #sale-modal-overlay.open, #return-modal-overlay.open{display:flex;}
+  .modal{background:var(--color-surface);border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;padding:26px 28px;}
+  .modal h3{font-family:var(--font-display);font-size:1.3rem;margin:0 0 18px;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .form-grid .full{grid-column:1/-1;}
+  .field label{display:block;font-size:0.76rem;color:var(--color-muted);margin-bottom:4px;letter-spacing:0.02em;}
+  .field input, .field select{width:100%;padding:9px 11px;border:1px solid var(--color-border);border-radius:7px;font-family:var(--font-body);font-size:0.88rem;background:var(--color-bg);}
+  .field input:focus, .field select:focus{outline:2px solid var(--color-primary-light);outline-offset:1px;}
+  .live-margin{grid-column:1/-1;background:var(--color-bg);border:1px dashed var(--color-border);border-radius:8px;padding:10px 14px;font-size:0.85rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;}
+  .live-margin b{font-family:var(--font-mono);}
+  .stock-hint{grid-column:1/-1;font-size:0.78rem;color:var(--color-muted);}
+  .stock-hint.warn{color:var(--color-danger);font-weight:600;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px;}
+
+  #toast-container{position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;gap:8px;z-index:60;}
+  .toast{background:var(--color-ink);color:#fff;padding:11px 16px;border-radius:8px;font-size:0.85rem;box-shadow:0 6px 18px rgba(0,0,0,0.18);animation:slideIn 0.2s ease;}
+  .toast.error{background:var(--color-danger);}
+  @keyframes slideIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+  .billing-patient-row{display:flex;gap:10px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--color-border);flex-wrap:wrap;}
+  .billing-patient-row label{font-size:0.8rem;color:var(--color-muted);white-space:nowrap;}
+  .billing-patient-row input{flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-bg);font-family:var(--font-body);font-size:0.88rem;}
+  .billing-discount-row{display:flex;gap:10px;align-items:center;padding:12px 18px;border-top:1px solid var(--color-border);flex-wrap:wrap;font-size:0.86rem;}
+  .billing-discount-row label{color:var(--color-muted);}
+  .billing-discount-row input[type=number]{width:90px;padding:8px 10px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-bg);font-family:var(--font-body);}
+  .billing-discount-row select{padding:8px 10px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-bg);font-family:var(--font-body);}
+  .billing-discount-row .spacer{flex:1;}
+  .bill-row{cursor:pointer;}
+  .bill-row:hover{background:var(--color-bg);}
+  .chevron-sm{display:inline-block;transition:transform 0.15s ease;color:var(--color-muted);}
+  .chevron-sm.open{transform:rotate(180deg);}
+  .bill-detail-cell{padding:0 !important;background:var(--color-bg);}
+  .bill-detail-inner{padding:14px 18px;}
+  .bill-detail-inner table{background:var(--color-surface);border-radius:8px;overflow:hidden;}
+  .bill-meta-line{font-size:0.82rem;color:var(--color-muted);margin-bottom:10px;}
+
+  @media (max-width:720px){
+    .form-grid{grid-template-columns:1fr;}
+    thead{display:none;}
+    tbody td{display:block;padding:6px 18px;}
+    tbody tr{display:block;padding:10px 0;border-bottom:1px solid var(--color-border);}
+  }
+  :focus-visible{outline:2px solid var(--color-primary-light);outline-offset:2px;}
+</style>
+</head>
+<body>
+<noscript><div style="padding:14px 28px;background:#B23A2E;color:#fff;font-family:sans-serif">Rx Ledger needs JavaScript enabled to work.</div></noscript>
+
+<header>
+  <div class="brand">
+    <h1>Rx Ledger</h1>
+    <small>Medicine Inventory · Local</small>
+  </div>
+  <div id="save-status">—</div>
+</header>
+
+<div id="device-banner">
+  📍 Data is stored <b>only on this device/browser</b> — nothing is sent anywhere. Use <b>Export Backup</b> regularly, and use it to move your data to another computer or phone.
+</div>
+
+<main>
+  <section class="stats">
+    <div class="stat-card"><div class="num" id="stat-total">0</div><div class="label">Total medicines</div></div>
+    <div class="stat-card expired"><div class="num" id="stat-expired">0</div><div class="label">Expired</div></div>
+    <div class="stat-card soon"><div class="num" id="stat-soon">0</div><div class="label">Expiring soon</div></div>
+    <div class="stat-card safe"><div class="num" id="stat-categories">0</div><div class="label">Categories</div></div>
+    <div class="stat-card cost"><div class="num" id="stat-cost">₹0</div><div class="label">Total stock cost (at purchase price)</div></div>
+    <div class="stat-card profit"><div class="num" id="stat-profit">₹0</div><div class="label">Potential profit (current stock)</div></div>
+  </section>
+
+  <div class="toolbar">
+    <input type="text" id="search-input" placeholder="Search by name, manufacturer, or batch no...">
+    <select id="sort-select">
+      <option value="expiry-asc">Sort: Expiry (soonest first)</option>
+      <option value="expiry-desc">Sort: Expiry (latest first)</option>
+      <option value="name-asc">Sort: Name A–Z</option>
+      <option value="mfg-desc">Sort: Manufacturing date (newest)</option>
+      <option value="qty-asc">Sort: Quantity (lowest first)</option>
+      <option value="margin-desc">Sort: Margin per piece (highest first)</option>
+    </select>
+    <select id="threshold-select">
+      <option value="15">Warn within 15 days</option>
+      <option value="30" selected>Warn within 30 days</option>
+      <option value="60">Warn within 60 days</option>
+      <option value="90">Warn within 90 days</option>
+    </select>
+    <button class="btn btn-sale" id="add-sale-btn">🧾 Record Sale</button>
+    <button class="btn btn-return" id="add-return-btn">↺ Record Return</button>
+    <button class="btn btn-primary" id="add-btn">+ Add Medicine</button>
+  </div>
+
+  <div class="backup-row">
+    <button class="btn btn-ghost" id="export-json-btn">⬇ Export Backup (.json)</button>
+    <button class="btn btn-ghost" id="export-csv-btn">⬇ Export Inventory (.csv)</button>
+    <button class="btn btn-ghost" id="export-sales-csv-btn">⬇ Export Sales (.csv)</button>
+    <button class="btn btn-ghost" id="export-bills-csv-btn">⬇ Export Bills (.csv)</button>
+    <button class="btn btn-ghost" id="import-btn">⬆ Import Backup</button>
+    <input type="file" id="import-input" accept="application/json">
+    <span class="hint">Import restores from a .json file exported by this app.</span>
+  </div>
+
+  <h3 class="section-label">Billing</h3>
+  <div class="category-section" id="billing-panel">
+    <div class="category-header" style="cursor:default;">
+      <h2>🧮 Live Bill</h2>
+      <span class="sales-summary">Adding an item deducts stock right away — Cancel Bill restores it.</span>
+    </div>
+    <div class="billing-patient-row">
+      <label for="bill-patient-name">Patient / Customer:</label>
+      <input type="text" id="bill-patient-name" placeholder="Name (optional — defaults to Walk-in)">
+    </div>
+    <div class="billing-add-row">
+      <select id="bill-medicine"></select>
+      <input type="number" id="bill-qty" min="1" step="1" value="1">
+      <button type="button" class="btn btn-primary" id="bill-add-line-btn">+ Add to Bill</button>
+    </div>
+    <div class="billing-hint" id="billing-select-hint">Pick a medicine to see MRP and stock.</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Product</th><th>Batch</th><th>Qty</th><th>MRP each</th><th>Line total</th><th></th></tr></thead>
+        <tbody id="bill-tbody"><tr><td colspan="6" class="empty-state">Bill is empty — add items above.</td></tr></tbody>
+      </table>
+    </div>
+    <div class="billing-discount-row">
+      <label for="bill-discount-value">Discount:</label>
+      <input type="number" id="bill-discount-value" min="0" step="0.01" value="0">
+      <select id="bill-discount-type">
+        <option value="percent">%</option>
+        <option value="flat">₹ flat</option>
+      </select>
+      <span class="spacer"></span>
+      <span>Subtotal: <b id="bill-subtotal">₹0.00</b></span>
+      <span>Discount: <b id="bill-discount-display">-₹0.00</b></span>
+    </div>
+    <div class="billing-total-row">
+      <span>Items in bill: <b id="bill-item-count">0</b></span>
+      <span class="grand-total">Grand Total: <b id="bill-grand-total">₹0.00</b></span>
+    </div>
+    <div class="billing-actions">
+      <button type="button" class="btn btn-ghost" id="bill-cancel-btn">Cancel Bill</button>
+      <button type="button" class="btn btn-sale" id="bill-complete-btn">✅ Complete Bill</button>
+    </div>
+  </div>
+
+  <h3 class="section-label">Sales</h3>
+  <div class="category-section" id="daily-summary-section">
+    <div class="category-header" data-toggle-daily="1">
+      <h2>📅 Daily Sales Summary <span class="count" id="daily-summary-count">0</span></h2>
+      <span class="sales-summary" id="daily-summary-total">₹0 all-time</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Date</th><th>Transactions</th><th>Qty sold</th><th>Total revenue</th><th>Total profit</th></tr></thead>
+        <tbody id="daily-summary-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="category-section" id="sales-section">
+    <div class="category-header" data-toggle-sales="1">
+      <h2>🧾 Sales &amp; Returns <span class="count" id="sales-count">0</span></h2>
+      <span class="sales-summary" id="sales-summary">₹0 revenue · ₹0 profit</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Date</th><th>Product</th><th>Batch</th><th>Qty</th><th>Revenue</th><th>Profit</th><th></th></tr></thead>
+        <tbody id="sales-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <h3 class="section-label">Inventory</h3>
+  <div id="sections-container">
+    <div class="empty-state">Loading your inventory…</div>
+  </div>
+</main>
+
+<!-- Add / Edit medicine modal -->
+<div id="modal-overlay">
+  <div class="modal">
+    <h3 id="modal-title">Add Medicine</h3>
+    <form id="medicine-form">
+      <input type="hidden" id="f-id">
+      <div class="form-grid">
+        <div class="field full">
+          <label for="f-name">Product name *</label>
+          <input type="text" id="f-name" required>
+        </div>
+        <div class="field">
+          <label for="f-category">Disease / category *</label>
+          <input type="text" id="f-category" list="category-list" required placeholder="e.g. Diabetes">
+          <datalist id="category-list">
+            <option value="Fever & Pain">
+            <option value="Antibiotics">
+            <option value="Diabetes">
+            <option value="Cardiac">
+            <option value="Respiratory">
+            <option value="Gastro">
+            <option value="Skin & Allergy">
+            <option value="Vitamins & Supplements">
+            <option value="Other">
+          </datalist>
+        </div>
+        <div class="field">
+          <label for="f-manufacturer">Manufacturer</label>
+          <input type="text" id="f-manufacturer">
+        </div>
+        <div class="field">
+          <label for="f-batch">Batch no.</label>
+          <input type="text" id="f-batch">
+        </div>
+        <div class="field">
+          <label for="f-mfg">Manufacturing month *</label>
+          <input type="month" id="f-mfg" required>
+        </div>
+        <div class="field">
+          <label for="f-exp">Expiry month *</label>
+          <input type="month" id="f-exp" required>
+        </div>
+        <div class="field">
+          <label for="f-qty">Quantity in stock</label>
+          <input type="number" id="f-qty" min="0" step="1" value="0">
+        </div>
+        <div class="field">
+          <label for="f-purchase">Purchasing price / unit (₹)</label>
+          <input type="number" id="f-purchase" min="0" step="0.01" value="0">
+        </div>
+        <div class="field">
+          <label for="f-mrp">MRP / unit (₹)</label>
+          <input type="number" id="f-mrp" min="0" step="0.01" value="0">
+        </div>
+        <div class="live-margin">
+          <span>Margin per piece: <b id="live-margin-pc">₹0.00</b></span>
+          <span>Margin on this lot: <b id="live-margin-lot">₹0.00</b></span>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="cancel-btn">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="save-btn">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Record single sale modal -->
+<div id="sale-modal-overlay">
+  <div class="modal">
+    <h3>Record Sale</h3>
+    <form id="sale-form">
+      <div class="form-grid">
+        <div class="field full">
+          <label for="s-medicine">Medicine *</label>
+          <select id="s-medicine" required></select>
+        </div>
+        <div class="field">
+          <label for="s-qty">Quantity sold *</label>
+          <input type="number" id="s-qty" min="1" step="1" value="1" required>
+        </div>
+        <div class="field">
+          <label for="s-date">Sale date *</label>
+          <input type="date" id="s-date" required>
+        </div>
+        <div class="live-margin">
+          <span>Revenue: <b id="sale-live-revenue">₹0.00</b></span>
+          <span>Profit: <b id="sale-live-profit">₹0.00</b></span>
+        </div>
+        <div class="stock-hint" id="sale-stock-hint">Select a medicine to see available stock.</div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="sale-cancel-btn">Cancel</button>
+        <button type="submit" class="btn btn-sale">Record Sale</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Record return modal -->
+<div id="return-modal-overlay">
+  <div class="modal">
+    <h3>Record Return / Unsold</h3>
+    <form id="return-form">
+      <div class="form-grid">
+        <div class="field full">
+          <label for="return-medicine">Medicine *</label>
+          <select id="return-medicine" required></select>
+        </div>
+        <div class="field">
+          <label for="return-qty">Quantity returned *</label>
+          <input type="number" id="return-qty" min="1" step="1" value="1" required>
+        </div>
+        <div class="field">
+          <label for="return-date">Return date *</label>
+          <input type="date" id="return-date" required>
+        </div>
+        <div class="field full">
+          <label for="return-reason">Reason</label>
+          <select id="return-reason">
+            <option value="Customer return">Customer return</option>
+            <option value="Unsold stock">Unsold stock</option>
+            <option value="Damaged">Damaged</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="live-margin">
+          <span>Stock restored: <b id="return-live-qty">0</b></span>
+          <span>Revenue/profit adjustment: <b id="return-live-impact">₹0.00</b></span>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="return-cancel-btn">Cancel</button>
+        <button type="submit" class="btn btn-return">Record Return</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+const MED_KEY = 'rxLedgerMedicines_v1';
+const SALES_KEY = 'rxLedgerSales_v1';
+const BILLS_KEY = 'rxLedgerBills_v1';
+const BILL_COUNTER_KEY = 'rxLedgerBillCounter_v1';
+const CART_KEY = 'rxLedgerCart_v1';
+
+// localStorage can throw (private mode, blocked site data) — never let that break the whole app.
+const store = {
+  get(k){ try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v){ try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+};
+function r2(n){ return Math.round((Number(n) + Number.EPSILON) * 100) / 100; }
+
+let medicines = [];
+let sales = [];
+let bills = []; // completed bills: {id, billNumber, patientName, date, itemCount, totalQty, subtotal, discountType, discountValue, discountAmount, grandTotal, totalProfit, createdAt}
+let cart = []; // in-progress bill: {medicineId, productName, batchNo, category, mrp, purchasePrice, quantity, lineTotal, lineProfit}
+let billCounter = Number(store.get(BILL_COUNTER_KEY)) || 0;
+let collapsedCategories = new Set();
+let salesCollapsed = false;
+let dailySummaryCollapsed = false;
+let expandedBills = new Set();
+
+const el = (id) => document.getElementById(id);
+const sectionsContainer = el('sections-container');
+
+function showToast(msg, isError){
+  const t = document.createElement('div');
+  t.className = 'toast' + (isError ? ' error' : '');
+  t.textContent = msg;
+  el('toast-container').appendChild(t);
+  setTimeout(() => t.remove(), 3400);
+}
+function setSaveStatus(text, isError){
+  const s = el('save-status');
+  s.textContent = text;
+  s.style.color = isError ? '#F3B3AA' : '#C9D8CE';
+}
+function uuid(){
+  return (crypto.randomUUID ? crypto.randomUUID() :
+    'id-' + Date.now() + '-' + Math.random().toString(16).slice(2));
+}
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+/* ---------- Storage layer (on-device) ---------- */
+function loadMedicines(){
+  try {
+    const raw = localStorage.getItem(MED_KEY);
+    medicines = raw ? JSON.parse(raw) : [];
+    medicines = medicines.map(m => {
+      if (m.mrp === undefined) m.mrp = m.price !== undefined ? Number(m.price) : 0;
+      if (m.purchasePrice === undefined) m.purchasePrice = 0;
+      delete m.price;
+      // Older records may have full dates (YYYY-MM-DD) from before the month-only change.
+      if (m.mfgDate && String(m.mfgDate).length > 7) m.mfgDate = String(m.mfgDate).slice(0, 7);
+      if (m.expiryDate && String(m.expiryDate).length > 7) m.expiryDate = String(m.expiryDate).slice(0, 7);
+      return m;
+    });
+  } catch (err) {
+    medicines = [];
+    showToast('Could not read saved inventory: ' + err.message, true);
+  }
+}
+function loadSales(){
+  try {
+    const raw = localStorage.getItem(SALES_KEY);
+    sales = raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    sales = [];
+    showToast('Could not read saved sales: ' + err.message, true);
+  }
+}
+function loadBills(){
+  try {
+    const raw = localStorage.getItem(BILLS_KEY);
+    bills = raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    bills = [];
+    showToast('Could not read saved bills: ' + err.message, true);
+  }
+}
+function loadCart(){
+  try {
+    const raw = localStorage.getItem(CART_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    cart = Array.isArray(parsed) ? parsed : [];
+  } catch (err) { cart = []; }
+}
+function persistCart(){
+  try { localStorage.setItem(CART_KEY, JSON.stringify(cart)); } catch (err) { /* non-fatal */ }
+}
+function persistBills(){
+  try {
+    localStorage.setItem(BILLS_KEY, JSON.stringify(bills));
+    setSaveStatus('Saved ' + new Date().toLocaleTimeString());
+  } catch (err) {
+    setSaveStatus('Save failed', true);
+    showToast('Could not save bills: ' + err.message, true);
+  }
+}
+function persistMedicines(){
+  try {
+    localStorage.setItem(MED_KEY, JSON.stringify(medicines));
+    setSaveStatus('Saved ' + new Date().toLocaleTimeString());
+  } catch (err) {
+    setSaveStatus('Save failed', true);
+    showToast('Could not save inventory: ' + err.message, true);
+  }
+}
+function persistSales(){
+  try {
+    localStorage.setItem(SALES_KEY, JSON.stringify(sales));
+    setSaveStatus('Saved ' + new Date().toLocaleTimeString());
+  } catch (err) {
+    setSaveStatus('Save failed', true);
+    showToast('Could not save sales: ' + err.message, true);
+  }
+}
+
+/* ---------- Status & money helpers ---------- */
+function monthEnd(ym){
+  if (!ym) return null;
+  const parts = String(ym).split('-');
+  const y = Number(parts[0]), m = Number(parts[1]);
+  if (!y || !m) return null;
+  const d = new Date(y, m, 0); // day 0 of next month = last day of this month
+  d.setHours(23,59,59,999);
+  return d;
+}
+function daysUntil(ym){
+  // Medicine mfg/expiry are stored as "YYYY-MM" — a pack is treated as valid through the end of its printed expiry month.
+  const end = monthEnd(ym);
+  if (!end) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.round((end - today) / 86400000);
+}
+function formatMonthYear(ym){
+  if (!ym) return '—';
+  const parts = String(ym).split('-');
+  const y = Number(parts[0]), m = Number(parts[1]);
+  if (!y || !m) return ym;
+  const d = new Date(y, m - 1, 1);
+  return d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+}
+function getThreshold(){ return Number(el('threshold-select').value); }
+function statusFor(med){
+  const d = daysUntil(med.expiryDate);
+  if (d === null) return 'ok';
+  if (d < 0) return 'expired';
+  if (d <= getThreshold()) return 'soon';
+  return 'ok';
+}
+function stampLabel(status, med){
+  const d = daysUntil(med.expiryDate);
+  if (status === 'expired') return 'EXPIRED · ' + Math.abs(d) + 'd ago';
+  if (status === 'soon') return d + 'd left';
+  return 'IN DATE';
+}
+function marginPerUnit(m){ return Number(m.mrp || 0) - Number(m.purchasePrice || 0); }
+function marginForLot(m){ return marginPerUnit(m) * Number(m.quantity || 0); }
+function fmtMoney(n){
+  const num = Number(n) || 0;
+  const sign = num < 0 ? '-' : '';
+  return sign + '₹' + Math.abs(num).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+}
+function formatDate(d){
+  if (!d) return '—';
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d));
+  const dt = iso ? new Date(+iso[1], +iso[2] - 1, +iso[3]) : new Date(d); // parse as local date, avoids off-by-one in some timezones
+  if (isNaN(dt)) return d;
+  return dt.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ---------- Shared medicine <select> builder ---------- */
+function buildMedicineOptions(disableZero){
+  const sorted = medicines.slice().sort((a,b) => a.productName.localeCompare(b.productName));
+  return '<option value="">Select a medicine…</option>' + sorted.map(m => {
+    const zero = Number(m.quantity) === 0;
+    const expired = statusFor(m) === 'expired';
+    // Sales/billing: out-of-stock and EXPIRED batches can't be selected. Returns (disableZero=false) allow both.
+    const blocked = disableZero && (zero || expired);
+    const disabledAttr = blocked ? 'disabled' : '';
+    const note = disableZero ? (expired ? ' — EXPIRED' : (zero ? ' — OUT OF STOCK' : '')) : '';
+    return `<option value="${escapeHtml(m.id)}" ${disabledAttr}>${escapeHtml(m.productName)} — ${escapeHtml(m.batchNo || 'no batch')} (${escapeHtml(m.quantity)} in stock)${note}</option>`;
+  }).join('');
+}
+function populateMedicineSelect(selectId, disableZero){
+  el(selectId).innerHTML = buildMedicineOptions(disableZero);
+}
+
+/* ---------- Rendering: inventory ---------- */
+function getFiltered(){
+  const q = el('search-input').value.trim().toLowerCase();
+  let list = medicines.filter(m => {
+    if (!q) return true;
+    return (m.productName + ' ' + m.manufacturer + ' ' + m.batchNo + ' ' + m.category).toLowerCase().includes(q);
+  });
+  const sort = el('sort-select').value;
+  list = list.slice().sort((a, b) => {
+    if (sort === 'expiry-asc') return new Date(a.expiryDate) - new Date(b.expiryDate);
+    if (sort === 'expiry-desc') return new Date(b.expiryDate) - new Date(a.expiryDate);
+    if (sort === 'name-asc') return a.productName.localeCompare(b.productName);
+    if (sort === 'mfg-desc') return new Date(b.mfgDate) - new Date(a.mfgDate);
+    if (sort === 'qty-asc') return a.quantity - b.quantity;
+    if (sort === 'margin-desc') return marginPerUnit(b) - marginPerUnit(a);
+    return 0;
+  });
+  return list;
+}
+
+function renderInventory(){
+  const filtered = getFiltered();
+
+  el('stat-total').textContent = medicines.length;
+  el('stat-expired').textContent = medicines.filter(m => statusFor(m) === 'expired').length;
+  el('stat-soon').textContent = medicines.filter(m => statusFor(m) === 'soon').length;
+  el('stat-categories').textContent = new Set(medicines.map(m => m.category)).size;
+  const totalCost = medicines.reduce((sum, m) => sum + (Number(m.purchasePrice || 0) * Number(m.quantity || 0)), 0);
+  el('stat-cost').textContent = fmtMoney(totalCost);
+  const totalProfit = medicines.reduce((sum, m) => sum + marginForLot(m), 0);
+  el('stat-profit').textContent = fmtMoney(totalProfit);
+
+  if (medicines.length === 0){
+    sectionsContainer.innerHTML = '<div class="empty-state">No medicines yet. Click "+ Add Medicine" to add your first one.</div>';
+    return;
+  }
+  if (filtered.length === 0){
+    sectionsContainer.innerHTML = '<div class="empty-state">No medicines match your search.</div>';
+    return;
+  }
+
+  const groups = {};
+  filtered.forEach(m => {
+    if (!groups[m.category]) groups[m.category] = [];
+    groups[m.category].push(m);
+  });
+
+  sectionsContainer.innerHTML = '';
+  Object.keys(groups).sort().forEach(cat => {
+    const items = groups[cat];
+    const isCollapsed = collapsedCategories.has(cat);
+    const section = document.createElement('div');
+    section.className = 'category-section' + (isCollapsed ? ' collapsed' : '');
+
+    const rowsHtml = items.map(m => {
+      const status = statusFor(m);
+      const mpu = marginPerUnit(m);
+      const lot = marginForLot(m);
+      const marginClass = mpu < 0 ? 'margin-neg' : 'margin-pos';
+      const qtyClass = Number(m.quantity) === 0 ? 'qty-zero' : '';
+      return `<tr class="${status === 'expired' ? 'row-expired' : status === 'soon' ? 'row-soon' : ''}">
+        <td><div class="med-name">${escapeHtml(m.productName)}</div><div class="med-sub">${escapeHtml(m.manufacturer || '—')}</div></td>
+        <td class="mono">${escapeHtml(m.batchNo || '—')}</td>
+        <td class="mono">${formatMonthYear(m.mfgDate)}</td>
+        <td class="mono">${formatMonthYear(m.expiryDate)}</td>
+        <td class="${qtyClass}">${escapeHtml(m.quantity)}${Number(m.quantity) === 0 ? ' (out)' : ''}</td>
+        <td><div class="mono">${fmtMoney(m.purchasePrice)}</div><div class="med-sub">MRP ${fmtMoney(m.mrp)}</div></td>
+        <td><div class="${marginClass}">${fmtMoney(mpu)}/pc</div><div class="med-sub">${fmtMoney(lot)} lot</div></td>
+        <td><span class="status-stamp ${status}">${stampLabel(status, m)}</span></td>
+        <td>
+          <div class="row-actions">
+            <button data-edit="${escapeHtml(m.id)}" title="Edit">✎</button>
+            <button data-delete="${escapeHtml(m.id)}" title="Delete">🗑</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+
+    section.innerHTML = `
+      <div class="category-header" data-toggle="${escapeHtml(cat)}">
+        <h2>${escapeHtml(cat)} <span class="count">${items.length}</span></h2>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Product</th><th>Batch</th><th>Mfg date</th><th>Expiry</th><th>Qty</th><th>Purchase / MRP</th><th>Margin</th><th>Status</th><th></th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>`;
+    sectionsContainer.appendChild(section);
+  });
+}
+
+/* ---------- Rendering: sales & returns (bills bundled into one row each) ---------- */
+function renderSales(){
+  const standalone = sales.filter(s => !s.billId); // single sales + all returns
+  const totalRevenue = sales.reduce((s, x) => s + Number(x.revenue || 0), 0);
+  const totalProfit = sales.reduce((s, x) => s + Number(x.profit || 0), 0);
+  el('sales-count').textContent = standalone.length + bills.length;
+  el('sales-summary').textContent = fmtMoney(totalRevenue) + ' revenue · ' + fmtMoney(totalProfit) + ' profit';
+
+  const tbody = el('sales-tbody');
+  if (standalone.length === 0 && bills.length === 0){
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No sales recorded yet. Use Record Sale or Complete a Bill above.</td></tr>';
+    return;
+  }
+
+  const rows = [];
+  standalone.forEach(s => rows.push({ kind: 'single', date: s.date, createdAt: s.createdAt || 0, data: s }));
+  bills.forEach(b => rows.push({ kind: 'bill', date: b.date, createdAt: b.createdAt || 0, data: b }));
+  rows.sort((a, b) => new Date(b.date) - new Date(a.date) || b.createdAt - a.createdAt);
+
+  tbody.innerHTML = rows.map(row => {
+    if (row.kind === 'single'){
+      const s = row.data;
+      const isReturn = s.type === 'return';
+      const subLabel = isReturn ? ('Return' + (s.reason ? ' · ' + escapeHtml(s.reason) : '')) : 'Single sale';
+      const profitClass = Number(s.profit) < 0 ? 'margin-neg' : 'margin-pos';
+      return `
+        <tr>
+          <td class="mono">${formatDate(s.date)}<div class="med-sub">${subLabel}</div></td>
+          <td><div class="med-name">${escapeHtml(s.productName)}</div></td>
+          <td class="mono">${escapeHtml(s.batchNo || '—')}</td>
+          <td class="${isReturn ? 'qty-zero' : ''}">${escapeHtml(s.quantity)}</td>
+          <td class="mono">${fmtMoney(s.revenue)}</td>
+          <td class="${profitClass}">${fmtMoney(s.profit)}</td>
+          <td><div class="row-actions"><button data-undo-sale="${escapeHtml(s.id)}" title="Undo">↺</button></div></td>
+        </tr>`;
+    }
+
+    // Bundled bill row — click the row (or chevron) to expand its line items.
+    const b = row.data;
+    const isOpen = expandedBills.has(b.id);
+    const lines = sales.filter(s => s.billId === b.id);
+    const profitClass = Number(b.totalProfit) < 0 ? 'margin-neg' : 'margin-pos';
+    const detailRows = lines.map(l => `
+      <tr>
+        <td>${escapeHtml(l.productName)}</td>
+        <td class="mono">${escapeHtml(l.batchNo || '—')}</td>
+        <td>${escapeHtml(l.quantity)}</td>
+        <td class="mono">${fmtMoney(l.mrpAtSale)}</td>
+        <td class="mono">${fmtMoney(l.revenue)}</td>
+        <td class="${Number(l.profit) < 0 ? 'margin-neg' : 'margin-pos'}">${fmtMoney(l.profit)}</td>
+      </tr>`).join('');
+    const discountNote = b.discountAmount > 0
+      ? `Subtotal ${fmtMoney(b.subtotal)} · Discount −${fmtMoney(b.discountAmount)}${b.discountType === 'percent' ? ' (' + b.discountValue + '%)' : ''} · `
+      : '';
+    return `
+      <tr class="bill-row" data-bill-toggle="${escapeHtml(b.id)}">
+        <td class="mono">${formatDate(b.date)}<div class="med-sub">Bill #${escapeHtml(b.billNumber)}</div></td>
+        <td><div class="med-name">${escapeHtml(b.patientName)}</div><div class="med-sub">${escapeHtml(b.itemCount)} item${b.itemCount === 1 ? '' : 's'}</div></td>
+        <td class="mono">—</td>
+        <td>${escapeHtml(b.totalQty)}</td>
+        <td class="mono">${fmtMoney(b.grandTotal)}</td>
+        <td class="${profitClass}">${fmtMoney(b.totalProfit)}</td>
+        <td><span class="chevron-sm ${isOpen ? 'open' : ''}">▾</span></td>
+      </tr>
+      <tr class="bill-detail-row" style="${isOpen ? '' : 'display:none;'}">
+        <td colspan="7" class="bill-detail-cell">
+          <div class="bill-detail-inner">
+            <div class="bill-meta-line">${discountNote}Grand Total: <b>${fmtMoney(b.grandTotal)}</b></div>
+            <table>
+              <thead><tr><th>Product</th><th>Batch</th><th>Qty</th><th>MRP</th><th>Revenue</th><th>Profit</th></tr></thead>
+              <tbody>${detailRows}</tbody>
+            </table>
+            <div class="row-actions" style="margin-top:10px;">
+              <button data-undo-bill="${escapeHtml(b.id)}" title="Undo entire bill" style="width:auto;padding:6px 12px;">↺ Undo Bill</button>
+            </div>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+document.querySelector('[data-toggle-sales]').addEventListener('click', () => {
+  salesCollapsed = !salesCollapsed;
+  el('sales-section').classList.toggle('collapsed', salesCollapsed);
+});
+
+/* ---------- Rendering: daily sales summary ---------- */
+function renderDailySummary(){
+  const byDate = {};
+  sales.forEach(s => {
+    if (!byDate[s.date]) byDate[s.date] = { count: 0, qty: 0, revenue: 0, profit: 0, bills: new Set() };
+    // A multi-item bill is ONE transaction, not one per line item.
+    if (s.billId){
+      if (!byDate[s.date].bills.has(s.billId)){ byDate[s.date].bills.add(s.billId); byDate[s.date].count += 1; }
+    } else {
+      byDate[s.date].count += 1;
+    }
+    byDate[s.date].qty += Number(s.quantity) || 0;
+    byDate[s.date].revenue += Number(s.revenue) || 0;
+    byDate[s.date].profit += Number(s.profit) || 0;
+  });
+  const dates = Object.keys(byDate).sort((a, b) => new Date(b) - new Date(a));
+
+  el('daily-summary-count').textContent = dates.length + (dates.length === 1 ? ' day' : ' days');
+  const allTimeRevenue = sales.reduce((s, x) => s + Number(x.revenue || 0), 0);
+  el('daily-summary-total').textContent = fmtMoney(allTimeRevenue) + ' all-time';
+
+  const tbody = el('daily-summary-tbody');
+  if (dates.length === 0){
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No sales recorded yet.</td></tr>';
+    return;
+  }
+  const today = todayStr();
+  tbody.innerHTML = dates.map(d => {
+    const row = byDate[d];
+    const isToday = d === today;
+    const profitClass = row.profit < 0 ? 'margin-neg' : 'margin-pos';
+    return `<tr class="${isToday ? 'row-today' : ''}">
+      <td class="mono">${formatDate(d)}${isToday ? ' <span class="med-sub">(Today)</span>' : ''}</td>
+      <td>${row.count}</td>
+      <td>${row.qty}</td>
+      <td class="mono">${fmtMoney(row.revenue)}</td>
+      <td class="${profitClass}">${fmtMoney(row.profit)}</td>
+    </tr>`;
+  }).join('');
+}
+
+document.querySelector('[data-toggle-daily]').addEventListener('click', () => {
+  dailySummaryCollapsed = !dailySummaryCollapsed;
+  el('daily-summary-section').classList.toggle('collapsed', dailySummaryCollapsed);
+});
+
+el('sales-tbody').addEventListener('click', (e) => {
+  const billToggle = e.target.closest('[data-bill-toggle]');
+  if (billToggle){
+    const id = billToggle.getAttribute('data-bill-toggle');
+    expandedBills.has(id) ? expandedBills.delete(id) : expandedBills.add(id);
+    renderSales();
+    return;
+  }
+  const undoBillBtn = e.target.closest('[data-undo-bill]');
+  if (undoBillBtn){
+    const billId = undoBillBtn.getAttribute('data-undo-bill');
+    const bill = bills.find(b => b.id === billId);
+    if (!bill) return;
+    if (!confirm('Undo Bill #' + bill.billNumber + ' for ' + bill.patientName + '? All ' + bill.itemCount + ' item(s) will be restored to stock.')) return;
+    sales.filter(s => s.billId === billId).forEach(l => {
+      const med = medicines.find(m => m.id === l.medicineId);
+      if (med) med.quantity = Number(med.quantity) + Number(l.quantity);
+    });
+    persistMedicines();
+    sales = sales.filter(s => s.billId !== billId);
+    persistSales();
+    bills = bills.filter(b => b.id !== billId);
+    persistBills();
+    expandedBills.delete(billId);
+    showToast('Bill undone — stock restored.');
+    renderAll();
+    return;
+  }
+  const undoBtn = e.target.closest('[data-undo-sale]');
+  if (!undoBtn) return;
+  const saleId = undoBtn.getAttribute('data-undo-sale');
+  const sale = sales.find(s => s.id === saleId);
+  if (!sale) return;
+  const kind = sale.type === 'return' ? 'return' : 'sale';
+  if (!confirm('Undo this ' + kind + ' of ' + Math.abs(sale.quantity) + ' × "' + sale.productName + '"? Stock will be adjusted if the medicine still exists.')) return;
+
+  const med = medicines.find(m => m.id === sale.medicineId);
+  if (med){
+    med.quantity = Number(med.quantity) + Number(sale.quantity); // negative quantity on returns undoes correctly
+    persistMedicines();
+  } else {
+    showToast('Note: that medicine no longer exists, so stock could not be adjusted.', true);
+  }
+  sales = sales.filter(s => s.id !== saleId);
+  persistSales();
+  showToast(kind === 'return' ? 'Return undone.' : 'Sale undone.');
+  renderAll();
+});
+
+/* ---------- Rendering: live bill ---------- */
+function computeCartTotals(){
+  const subtotal = cart.reduce((s,l) => s + l.lineTotal, 0);
+  const discType = el('bill-discount-type').value;
+  const discVal = Number(el('bill-discount-value').value) || 0;
+  let discountAmount = r2(discType === 'percent' ? (subtotal * discVal / 100) : discVal);
+  if (discountAmount < 0) discountAmount = 0;
+  if (discountAmount > subtotal) discountAmount = subtotal;
+  const grandTotal = r2(subtotal - discountAmount);
+  return { subtotal, discountAmount, grandTotal, discType, discVal };
+}
+
+function renderCart(){
+  persistCart(); // stock is deducted as items are added, so the open bill must survive a refresh
+  const tbody = el('bill-tbody');
+  if (cart.length === 0){
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Bill is empty — add items above.</td></tr>';
+  } else {
+    tbody.innerHTML = cart.map((line, idx) => `
+      <tr>
+        <td class="med-name">${escapeHtml(line.productName)}</td>
+        <td class="mono">${escapeHtml(line.batchNo || '—')}</td>
+        <td>${escapeHtml(line.quantity)}</td>
+        <td class="mono">${fmtMoney(line.mrp)}</td>
+        <td class="mono">${fmtMoney(line.lineTotal)}</td>
+        <td><div class="row-actions"><button data-remove-line="${idx}" title="Remove">🗑</button></div></td>
+      </tr>`).join('');
+  }
+  const itemCount = cart.reduce((s,l) => s + l.quantity, 0);
+  const totals = computeCartTotals();
+  el('bill-item-count').textContent = itemCount;
+  el('bill-subtotal').textContent = fmtMoney(totals.subtotal);
+  el('bill-discount-display').textContent = '-' + fmtMoney(totals.discountAmount);
+  el('bill-grand-total').textContent = fmtMoney(totals.grandTotal);
+}
+el('bill-discount-value').addEventListener('input', renderCart);
+el('bill-discount-type').addEventListener('change', renderCart);
+
+function renderAll(){
+  renderInventory();
+  renderSales();
+  renderDailySummary();
+  renderCart();
+  const prevBillMed = el('bill-medicine').value;
+  populateMedicineSelect('bill-medicine', true);
+  const opt = Array.from(el('bill-medicine').options).find(o => o.value === prevBillMed && !o.disabled);
+  if (opt) el('bill-medicine').value = prevBillMed;
+}
+
+/* ---------- Medicine add/edit modal ---------- */
+function updateLiveMargin(){
+  const purchase = Number(el('f-purchase').value) || 0;
+  const mrp = Number(el('f-mrp').value) || 0;
+  const qty = Number(el('f-qty').value) || 0;
+  const per = mrp - purchase;
+  el('live-margin-pc').textContent = fmtMoney(per);
+  el('live-margin-lot').textContent = fmtMoney(per * qty);
+  el('live-margin-pc').style.color = per < 0 ? 'var(--color-danger)' : 'var(--color-safe)';
+  el('live-margin-lot').style.color = per < 0 ? 'var(--color-danger)' : 'var(--color-safe)';
+}
+['f-purchase','f-mrp','f-qty'].forEach(id => el(id).addEventListener('input', updateLiveMargin));
+
+function openModal(med){
+  el('modal-title').textContent = med ? 'Edit Medicine' : 'Add Medicine';
+  el('f-id').value = med ? med.id : '';
+  el('f-name').value = med ? med.productName : '';
+  el('f-category').value = med ? med.category : '';
+  el('f-manufacturer').value = med ? med.manufacturer : '';
+  el('f-batch').value = med ? med.batchNo : '';
+  el('f-mfg').value = med ? med.mfgDate : '';
+  el('f-exp').value = med ? med.expiryDate : '';
+  el('f-qty').value = med ? med.quantity : 0;
+  el('f-purchase').value = med ? med.purchasePrice : 0;
+  el('f-mrp').value = med ? med.mrp : 0;
+  updateLiveMargin();
+  el('modal-overlay').classList.add('open');
+  el('f-name').focus();
+}
+function closeModal(){ el('modal-overlay').classList.remove('open'); }
+
+el('add-btn').addEventListener('click', () => openModal(null));
+el('cancel-btn').addEventListener('click', closeModal);
+el('modal-overlay').addEventListener('click', (e) => { if (e.target.id === 'modal-overlay') closeModal(); });
+
+el('medicine-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const mfg = el('f-mfg').value, exp = el('f-exp').value;
+  if (mfg && exp && new Date(mfg) > new Date(exp)){
+    showToast('Manufacturing date must be before expiry date.', true);
+    return;
+  }
+  const id = el('f-id').value;
+  const record = {
+    id: id || uuid(),
+    productName: el('f-name').value.trim(),
+    category: el('f-category').value.trim() || 'Other',
+    manufacturer: el('f-manufacturer').value.trim(),
+    batchNo: el('f-batch').value.trim(),
+    mfgDate: mfg,
+    expiryDate: exp,
+    quantity: Number(el('f-qty').value) || 0,
+    purchasePrice: Number(el('f-purchase').value) || 0,
+    mrp: Number(el('f-mrp').value) || 0
+  };
+
+  if (id){
+    const idx = medicines.findIndex(m => m.id === id);
+    if (idx !== -1) medicines[idx] = record;
+    showToast('Medicine updated.');
+  } else {
+    medicines.push(record);
+    showToast('Medicine added.');
+  }
+  persistMedicines();
+  closeModal();
+  renderAll();
+});
+
+sectionsContainer.addEventListener('click', (e) => {
+  const toggleCat = e.target.closest('[data-toggle]');
+  if (toggleCat){
+    const cat = toggleCat.getAttribute('data-toggle');
+    collapsedCategories.has(cat) ? collapsedCategories.delete(cat) : collapsedCategories.add(cat);
+    renderInventory();
+    return;
+  }
+  const editBtn = e.target.closest('[data-edit]');
+  if (editBtn){
+    const med = medicines.find(m => m.id === editBtn.getAttribute('data-edit'));
+    if (med) openModal(med);
+    return;
+  }
+  const delBtn = e.target.closest('[data-delete]');
+  if (delBtn){
+    const id = delBtn.getAttribute('data-delete');
+    const med = medicines.find(m => m.id === id);
+    if (!med) return;
+    if (!confirm('Delete "' + med.productName + '"? This cannot be undone.')) return;
+    medicines = medicines.filter(m => m.id !== id);
+    persistMedicines();
+    showToast('Medicine deleted.');
+    renderAll();
+  }
+});
+
+el('search-input').addEventListener('input', renderInventory);
+el('sort-select').addEventListener('change', renderInventory);
+el('threshold-select').addEventListener('change', renderInventory);
+
+/* ---------- Single sale modal ---------- */
+function updateSaleLivePreview(){
+  const medId = el('s-medicine').value;
+  const qty = Number(el('s-qty').value) || 0;
+  const med = medicines.find(m => m.id === medId);
+  const hint = el('sale-stock-hint');
+
+  if (!med){
+    el('sale-live-revenue').textContent = '₹0.00';
+    el('sale-live-profit').textContent = '₹0.00';
+    hint.textContent = 'Select a medicine to see available stock.';
+    hint.classList.remove('warn');
+    return;
+  }
+  const revenue = Number(med.mrp || 0) * qty;
+  const profit = marginPerUnit(med) * qty;
+  el('sale-live-revenue').textContent = fmtMoney(revenue);
+  el('sale-live-profit').textContent = fmtMoney(profit);
+
+  if (qty > Number(med.quantity)){
+    hint.textContent = 'Only ' + med.quantity + ' in stock — reduce the quantity.';
+    hint.classList.add('warn');
+  } else {
+    hint.textContent = med.quantity + ' currently in stock.';
+    hint.classList.remove('warn');
+  }
+}
+el('s-medicine').addEventListener('change', updateSaleLivePreview);
+el('s-qty').addEventListener('input', updateSaleLivePreview);
+
+function openSaleModal(){
+  if (medicines.length === 0){ showToast('Add a medicine to your inventory first.', true); return; }
+  populateMedicineSelect('s-medicine', true);
+  el('s-qty').value = 1;
+  el('s-date').value = todayStr();
+  updateSaleLivePreview();
+  el('sale-modal-overlay').classList.add('open');
+}
+function closeSaleModal(){ el('sale-modal-overlay').classList.remove('open'); }
+
+el('add-sale-btn').addEventListener('click', openSaleModal);
+el('sale-cancel-btn').addEventListener('click', closeSaleModal);
+el('sale-modal-overlay').addEventListener('click', (e) => { if (e.target.id === 'sale-modal-overlay') closeSaleModal(); });
+
+el('sale-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const medId = el('s-medicine').value;
+  const qty = Number(el('s-qty').value) || 0;
+  const date = el('s-date').value;
+  const med = medicines.find(m => m.id === medId);
+
+  if (!med){ showToast('Select a medicine.', true); return; }
+  if (qty < 1){ showToast('Quantity must be at least 1.', true); return; }
+  if (qty > Number(med.quantity)){ showToast('Not enough stock — only ' + med.quantity + ' available.', true); return; }
+
+  if (statusFor(med) === 'expired'){ showToast('This batch is expired and cannot be sold.', true); return; }
+
+  med.quantity = Number(med.quantity) - qty;
+  persistMedicines();
+
+  sales.push({
+    id: uuid(),
+    medicineId: med.id,
+    productName: med.productName,
+    category: med.category,
+    batchNo: med.batchNo,
+    quantity: qty,
+    mrpAtSale: med.mrp,
+    purchasePriceAtSale: med.purchasePrice,
+    revenue: Number(med.mrp || 0) * qty,
+    profit: marginPerUnit(med) * qty,
+    date: date,
+    createdAt: Date.now(),
+    type: 'sale'
+  });
+  persistSales();
+
+  showToast('Sale recorded — stock updated.');
+  closeSaleModal();
+  renderAll();
+});
+
+/* ---------- Return modal ---------- */
+function updateReturnLivePreview(){
+  const med = medicines.find(m => m.id === el('return-medicine').value);
+  const qty = Number(el('return-qty').value) || 0;
+  if (!med){
+    el('return-live-qty').textContent = '0';
+    el('return-live-impact').textContent = '₹0.00';
+    return;
+  }
+  el('return-live-qty').textContent = qty;
+  const impact = Number(med.mrp || 0) * qty;
+  el('return-live-impact').textContent = '-' + fmtMoney(impact);
+}
+el('return-medicine').addEventListener('change', updateReturnLivePreview);
+el('return-qty').addEventListener('input', updateReturnLivePreview);
+
+function openReturnModal(){
+  if (medicines.length === 0){ showToast('Add a medicine to your inventory first.', true); return; }
+  populateMedicineSelect('return-medicine', false);
+  el('return-qty').value = 1;
+  el('return-date').value = todayStr();
+  el('return-reason').value = 'Customer return';
+  updateReturnLivePreview();
+  el('return-modal-overlay').classList.add('open');
+}
+function closeReturnModal(){ el('return-modal-overlay').classList.remove('open'); }
+
+el('add-return-btn').addEventListener('click', openReturnModal);
+el('return-cancel-btn').addEventListener('click', closeReturnModal);
+el('return-modal-overlay').addEventListener('click', (e) => { if (e.target.id === 'return-modal-overlay') closeReturnModal(); });
+
+el('return-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const medId = el('return-medicine').value;
+  const qty = Number(el('return-qty').value) || 0;
+  const date = el('return-date').value;
+  const reason = el('return-reason').value;
+  const med = medicines.find(m => m.id === medId);
+
+  if (!med){ showToast('Select a medicine.', true); return; }
+  if (qty < 1){ showToast('Quantity must be at least 1.', true); return; }
+
+  med.quantity = Number(med.quantity) + qty;
+  persistMedicines();
+
+  sales.push({
+    id: uuid(),
+    medicineId: med.id,
+    productName: med.productName,
+    category: med.category,
+    batchNo: med.batchNo,
+    quantity: -qty,
+    mrpAtSale: med.mrp,
+    purchasePriceAtSale: med.purchasePrice,
+    revenue: -(Number(med.mrp || 0) * qty),
+    profit: -(marginPerUnit(med) * qty),
+    date: date,
+    createdAt: Date.now(),
+    type: 'return',
+    reason: reason
+  });
+  persistSales();
+
+  showToast('Return recorded — stock restored.');
+  closeReturnModal();
+  renderAll();
+});
+
+/* ---------- Live Bill (billing cart) ---------- */
+function updateBillingHint(){
+  const med = medicines.find(m => m.id === el('bill-medicine').value);
+  const hint = el('billing-select-hint');
+  if (!med){
+    hint.textContent = 'Pick a medicine to see MRP and stock.';
+    hint.classList.remove('warn');
+    return;
+  }
+  const qty = Number(el('bill-qty').value) || 0;
+  let text = escapeHtml(med.productName) + ' — MRP ' + fmtMoney(med.mrp) + ' · ' + med.quantity + ' in stock';
+  if (qty > Number(med.quantity)){
+    hint.innerHTML = text + ' — not enough stock!';
+    hint.classList.add('warn');
+  } else {
+    hint.innerHTML = text;
+    hint.classList.remove('warn');
+  }
+}
+el('bill-medicine').addEventListener('change', updateBillingHint);
+el('bill-qty').addEventListener('input', updateBillingHint);
+
+el('bill-add-line-btn').addEventListener('click', () => {
+  const medId = el('bill-medicine').value;
+  const qty = Number(el('bill-qty').value) || 0;
+  const med = medicines.find(m => m.id === medId);
+
+  if (!med){ showToast('Select a medicine to add.', true); return; }
+  if (qty < 1){ showToast('Quantity must be at least 1.', true); return; }
+  if (qty > Number(med.quantity)){ showToast('Not enough stock — only ' + med.quantity + ' available.', true); return; }
+
+  if (statusFor(med) === 'expired'){ showToast('This batch is expired and cannot be sold.', true); return; }
+
+  // Deduct stock immediately (real-time), as soon as it's added to the bill.
+  med.quantity = Number(med.quantity) - qty;
+  persistMedicines();
+
+  const lineMrp = Number(med.mrp || 0);
+  const linePurchase = Number(med.purchasePrice || 0);
+  const existing = cart.find(l => l.medicineId === medId);
+  if (existing){
+    existing.quantity += qty;
+    existing.lineTotal = existing.quantity * lineMrp;
+    existing.lineProfit = existing.quantity * (lineMrp - linePurchase);
+  } else {
+    cart.push({
+      medicineId: medId,
+      productName: med.productName,
+      batchNo: med.batchNo,
+      category: med.category,
+      mrp: lineMrp,
+      purchasePrice: linePurchase,
+      quantity: qty,
+      lineTotal: qty * lineMrp,
+      lineProfit: qty * (lineMrp - linePurchase)
+    });
+  }
+
+  el('bill-qty').value = 1;
+  renderAll();
+  updateBillingHint();
+  showToast(med.productName + ' added to bill.');
+});
+
+el('bill-tbody').addEventListener('click', (e) => {
+  const rmBtn = e.target.closest('[data-remove-line]');
+  if (!rmBtn) return;
+  const idx = Number(rmBtn.getAttribute('data-remove-line'));
+  const line = cart[idx];
+  if (!line) return;
+  const med = medicines.find(m => m.id === line.medicineId);
+  if (med){
+    med.quantity = Number(med.quantity) + line.quantity;
+    persistMedicines();
+  }
+  cart.splice(idx, 1);
+  renderAll();
+  showToast('Removed from bill — stock restored.');
+});
+
+el('bill-cancel-btn').addEventListener('click', () => {
+  if (cart.length === 0) return;
+  if (!confirm('Cancel this bill? All ' + cart.length + ' item(s) will be put back into stock.')) return;
+  cart.forEach(line => {
+    const med = medicines.find(m => m.id === line.medicineId);
+    if (med) med.quantity = Number(med.quantity) + line.quantity;
+  });
+  persistMedicines();
+  cart = [];
+  el('bill-patient-name').value = '';
+  el('bill-discount-value').value = 0;
+  el('bill-discount-type').value = 'percent';
+  renderAll();
+  showToast('Bill cancelled — stock restored.');
+});
+
+el('bill-complete-btn').addEventListener('click', () => {
+  if (cart.length === 0){ showToast('Add at least one item to the bill first.', true); return; }
+
+  const totals = computeCartTotals();
+  const ratio = totals.subtotal > 0 ? (totals.grandTotal / totals.subtotal) : 1;
+
+  billCounter += 1;
+  store.set(BILL_COUNTER_KEY, String(billCounter));
+  const billId = uuid();
+  const date = todayStr();
+  const patientName = el('bill-patient-name').value.trim() || 'Walk-in';
+
+  let billTotalProfit = 0;
+  cart.forEach(line => {
+    // Discount is applied proportionally across lines so revenue/profit stay accurate per medicine.
+    const adjRevenue = r2(line.lineTotal * ratio);
+    const adjProfit = r2(line.lineProfit - (line.lineTotal - adjRevenue));
+    billTotalProfit += adjProfit;
+    sales.push({
+      id: uuid(),
+      medicineId: line.medicineId,
+      productName: line.productName,
+      category: line.category,
+      batchNo: line.batchNo,
+      quantity: line.quantity,
+      mrpAtSale: line.mrp,
+      purchasePriceAtSale: line.purchasePrice,
+      revenue: adjRevenue,
+      profit: adjProfit,
+      date: date,
+      createdAt: Date.now(),
+      billId: billId,
+      billNumber: billCounter,
+      type: 'sale'
+    });
+  });
+  // Stock was already deducted per line as items were added — do not deduct again here.
+  persistSales();
+
+  bills.push({
+    id: billId,
+    billNumber: billCounter,
+    patientName: patientName,
+    date: date,
+    itemCount: cart.length,
+    totalQty: cart.reduce((s,l) => s + l.quantity, 0),
+    subtotal: totals.subtotal,
+    discountType: totals.discType,
+    discountValue: totals.discVal,
+    discountAmount: totals.discountAmount,
+    grandTotal: totals.grandTotal,
+    totalProfit: billTotalProfit,
+    createdAt: Date.now()
+  });
+  persistBills();
+
+  showToast('Bill #' + billCounter + ' completed for ' + patientName + ' — ' + fmtMoney(totals.grandTotal) + '.');
+  cart = [];
+  el('bill-patient-name').value = '';
+  el('bill-discount-value').value = 0;
+  el('bill-discount-type').value = 'percent';
+  renderAll();
+});
+
+/* ---------- Backup: export / import ---------- */
+function downloadBlob(content, filename, mime){
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+el('export-json-btn').addEventListener('click', () => {
+  downloadBlob(JSON.stringify({ medicines, sales, bills, billCounter }, null, 2), 'rx-ledger-backup-' + Date.now() + '.json', 'application/json');
+  showToast('Backup exported.');
+});
+
+el('export-csv-btn').addEventListener('click', () => {
+  const headers = ['Product Name','Category','Manufacturer','Batch No','Mfg Date','Expiry Date','Quantity','Purchase Price','MRP','Margin Per Unit','Margin On Lot'];
+  const rows = medicines.map(m => [
+    m.productName, m.category, m.manufacturer, m.batchNo, m.mfgDate, m.expiryDate, m.quantity,
+    m.purchasePrice, m.mrp, marginPerUnit(m).toFixed(2), marginForLot(m).toFixed(2)
+  ]);
+  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v ?? '').replace(/"/g,'""')}"`).join(',')).join('\n');
+  downloadBlob(csv, 'rx-ledger-inventory-' + Date.now() + '.csv', 'text/csv');
+  showToast('Inventory CSV exported.');
+});
+
+el('export-sales-csv-btn').addEventListener('click', () => {
+  const headers = ['Date','Bill #','Type','Product Name','Category','Batch No','Quantity','MRP At Sale','Purchase Price At Sale','Revenue','Profit','Reason'];
+  const rows = sales.map(s => [
+    s.date, s.billNumber || '', s.type || 'sale', s.productName, s.category, s.batchNo,
+    s.quantity, s.mrpAtSale, s.purchasePriceAtSale, Number(s.revenue).toFixed(2), Number(s.profit).toFixed(2), s.reason || ''
+  ]);
+  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v ?? '').replace(/"/g,'""')}"`).join(',')).join('\n');
+  downloadBlob(csv, 'rx-ledger-sales-' + Date.now() + '.csv', 'text/csv');
+  showToast('Sales CSV exported.');
+});
+
+el('export-bills-csv-btn').addEventListener('click', () => {
+  const headers = ['Date','Bill #','Patient Name','Items','Total Qty','Subtotal','Discount Type','Discount Value','Discount Amount','Grand Total','Profit'];
+  const rows = bills.map(b => [
+    b.date, b.billNumber, b.patientName, b.itemCount, b.totalQty,
+    b.subtotal.toFixed(2), b.discountType, b.discountValue, b.discountAmount.toFixed(2), b.grandTotal.toFixed(2), b.totalProfit.toFixed(2)
+  ]);
+  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v ?? '').replace(/"/g,'""')}"`).join(',')).join('\n');
+  downloadBlob(csv, 'rx-ledger-bills-' + Date.now() + '.csv', 'text/csv');
+  showToast('Bills CSV exported.');
+});
+
+el('import-btn').addEventListener('click', () => el('import-input').click());
+el('import-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      let importedMeds, importedSales, importedBills, importedCounter;
+      if (Array.isArray(parsed)){
+        importedMeds = parsed;
+        importedSales = sales;
+        importedBills = bills;
+        importedCounter = billCounter;
+      } else if (parsed && Array.isArray(parsed.medicines)){
+        importedMeds = parsed.medicines;
+        importedSales = Array.isArray(parsed.sales) ? parsed.sales : [];
+        importedBills = Array.isArray(parsed.bills) ? parsed.bills : [];
+        importedCounter = Number(parsed.billCounter) || 0;
+      } else {
+        throw new Error('File is not a valid backup.');
+      }
+      if (!confirm('This will replace current data with ' + importedMeds.length + ' medicines, ' + importedSales.length + ' sale/return lines, and ' + importedBills.length + ' bills from the file. Continue?')) return;
+
+      medicines = importedMeds.map(m => {
+        if (m.mrp === undefined) m.mrp = m.price !== undefined ? Number(m.price) : 0;
+        if (m.purchasePrice === undefined) m.purchasePrice = 0;
+        delete m.price;
+        if (m.mfgDate && String(m.mfgDate).length > 7) m.mfgDate = String(m.mfgDate).slice(0, 7);
+        if (m.expiryDate && String(m.expiryDate).length > 7) m.expiryDate = String(m.expiryDate).slice(0, 7);
+        return m;
+      });
+      sales = importedSales;
+      bills = importedBills;
+      billCounter = importedCounter;
+      store.set(BILL_COUNTER_KEY, String(billCounter));
+      cart = [];
+      expandedBills = new Set();
+      persistMedicines();
+      persistSales();
+      persistBills();
+      renderAll();
+      showToast('Backup imported.');
+    } catch (err) {
+      showToast('Import failed: ' + err.message, true);
+    } finally {
+      el('import-input').value = '';
+    }
+  };
+  reader.readAsText(file);
+});
+
+/* ---------- Keyboard + multi-tab safety ---------- */
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape'){ closeModal(); closeSaleModal(); closeReturnModal(); }
+});
+// If another browser tab changes the data, reload it here so two tabs can't overwrite each other with stale copies.
+window.addEventListener('storage', (e) => {
+  if (![MED_KEY, SALES_KEY, BILLS_KEY, CART_KEY, BILL_COUNTER_KEY].includes(e.key)) return;
+  loadMedicines(); loadSales(); loadBills(); loadCart();
+  billCounter = Number(store.get(BILL_COUNTER_KEY)) || 0;
+  renderAll();
+});
+
+/* ---------- Init ---------- */
+loadMedicines();
+loadSales();
+loadBills();
+loadCart();
+renderAll();
+</script>
+</body>
+</html>
